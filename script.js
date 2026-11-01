@@ -83,6 +83,7 @@ let particelle = [];     // scintille che volano via quando il serpente mangia
 let scossaFinoA = 0;     // fino a quando il campo deve tremare (dopo un game over)
 let record = leggiRecord(); // il punteggio migliore di sempre
 let recordBattuto;       // true se in questa partita il record è stato superato
+let istanteFinePartita = 0; // quando è finita l'ultima partita (in millisecondi)
 
 
 // ---------- 3b. Salvataggio del record ----------
@@ -252,6 +253,7 @@ function passoDiGioco() {
 // "haVinto" decide il colore del messaggio (verde se vinci, rosso se perdi).
 function finePartita(testo, haVinto) {
   partitaFinita = true;
+  istanteFinePartita = performance.now();
   clearInterval(timerGioco);
   testoMessaggio.textContent = testo;
   testoMessaggio.classList.toggle("vittoria", haVinto);
@@ -545,16 +547,56 @@ function ciclo(istante) {
 }
 
 
-// ---------- 10. Tastiera e pulsante ----------
+// ---------- 10. Comandi: tastiera, dito e pulsanti ----------
+
+// Le quattro direzioni possibili, con un nome ciascuna.
+// x e y dicono di quante celle si sposta la testa a ogni passo
+// (attenzione: la y cresce andando verso il BASSO).
+const DIREZIONI = {
+  su:       { x: 0,  y: -1 },
+  giu:      { x: 0,  y: 1 },
+  sinistra: { x: -1, y: 0 },
+  destra:   { x: 1,  y: 0 }
+};
 
 // Collega ogni freccia della tastiera a una direzione
 const DIREZIONI_TASTI = {
-  ArrowUp:    { x: 0,  y: -1 }, // su (la y cresce andando verso il basso)
-  ArrowDown:  { x: 0,  y: 1 },  // giù
-  ArrowLeft:  { x: -1, y: 0 },  // sinistra
-  ArrowRight: { x: 1,  y: 0 }   // destra
+  ArrowUp:    DIREZIONI.su,
+  ArrowDown:  DIREZIONI.giu,
+  ArrowLeft:  DIREZIONI.sinistra,
+  ArrowRight: DIREZIONI.destra
 };
 
+// Chiede al serpente di girare. La usano tutti i comandi (tastiera, swipe,
+// pulsanti), così le regole sono le stesse qualunque modo si usi per giocare.
+function cambiaDirezione(nuovaDirezione) {
+  if (partitaFinita) {
+    return;
+  }
+
+  // Confrontiamo con l'ultima direzione "prenotata" (o quella attuale).
+  // Usiamo una piccola coda di attesa: se il giocatore dà due comandi
+  // molto in fretta, nello stesso passo, nessuno dei due va perso.
+  const ultimaDirezione = prossimeDirezioni.length > 0
+    ? prossimeDirezioni[prossimeDirezioni.length - 1]
+    : direzione;
+
+  // Il serpente non può fare inversione a U (andrebbe addosso a se stesso)
+  const eInversione =
+    nuovaDirezione.x === -ultimaDirezione.x &&
+    nuovaDirezione.y === -ultimaDirezione.y;
+  // Chiedere di nuovo la stessa direzione non serve a niente
+  const eUguale =
+    nuovaDirezione.x === ultimaDirezione.x &&
+    nuovaDirezione.y === ultimaDirezione.y;
+
+  // Teniamo al massimo 2 direzioni in attesa
+  if (!eInversione && !eUguale && prossimeDirezioni.length < 2) {
+    prossimeDirezioni.push(nuovaDirezione);
+  }
+}
+
+// --- Tastiera ---
 document.addEventListener("keydown", function (evento) {
   // Spazio: ricomincia, ma solo a partita finita
   if (evento.code === "Space") {
@@ -570,30 +612,81 @@ document.addEventListener("keydown", function (evento) {
     return; // non è una freccia: ignoriamo il tasto
   }
   evento.preventDefault(); // evita che le frecce facciano scorrere la pagina
+  cambiaDirezione(nuovaDirezione);
+});
 
-  if (partitaFinita) {
+// --- Swipe (scorrere il dito sul campo) ---
+
+// Di quanti pixel deve muoversi il dito perché conti come uno swipe:
+// così un tocco appena tremolante non cambia direzione per sbaglio
+const SOGLIA_SWIPE = 25;
+
+const areaGioco = document.getElementById("area-gioco");
+let inizioTocco = null; // dove si trovava il dito all'inizio (o all'ultimo cambio)
+
+// Il dito tocca il campo: ci segniamo il punto di partenza
+areaGioco.addEventListener("touchstart", function (evento) {
+  const dito = evento.touches[0];
+  inizioTocco = { x: dito.clientX, y: dito.clientY };
+}, { passive: true });
+
+// Il dito si muove: appena ha percorso abbastanza strada, cambiamo direzione
+// subito, senza aspettare che venga staccato dallo schermo
+areaGioco.addEventListener("touchmove", function (evento) {
+  // Impedisce al browser di scorrere la pagina o ricaricarla mentre giochi.
+  // ("passive: false" qui sotto serve proprio a permettere preventDefault)
+  evento.preventDefault();
+  if (inizioTocco === null) {
     return;
   }
 
-  // Confrontiamo con l'ultima direzione "prenotata" (o quella attuale).
-  // Usiamo una piccola coda di attesa: se il giocatore preme due frecce
-  // molto in fretta, nello stesso passo, nessuna delle due va persa.
-  const ultimaDirezione = prossimeDirezioni.length > 0
-    ? prossimeDirezioni[prossimeDirezioni.length - 1]
-    : direzione;
+  const dito = evento.touches[0];
+  const spostamentoX = dito.clientX - inizioTocco.x;
+  const spostamentoY = dito.clientY - inizioTocco.y;
 
-  // Il serpente non può fare inversione a U (andrebbe addosso a se stesso)
-  const eInversione =
-    nuovaDirezione.x === -ultimaDirezione.x &&
-    nuovaDirezione.y === -ultimaDirezione.y;
-  // Premere di nuovo la stessa direzione non serve a niente
-  const eUguale =
-    nuovaDirezione.x === ultimaDirezione.x &&
-    nuovaDirezione.y === ultimaDirezione.y;
+  // Math.abs toglie il segno: ci interessa solo QUANTO si è mosso il dito
+  if (Math.max(Math.abs(spostamentoX), Math.abs(spostamentoY)) < SOGLIA_SWIPE) {
+    return; // movimento troppo piccolo: aspettiamo
+  }
 
-  // Teniamo al massimo 2 direzioni in attesa
-  if (!eInversione && !eUguale && prossimeDirezioni.length < 2) {
-    prossimeDirezioni.push(nuovaDirezione);
+  // Vince il verso in cui il dito si è mosso di più
+  if (Math.abs(spostamentoX) > Math.abs(spostamentoY)) {
+    cambiaDirezione(spostamentoX > 0 ? DIREZIONI.destra : DIREZIONI.sinistra);
+  } else {
+    cambiaDirezione(spostamentoY > 0 ? DIREZIONI.giu : DIREZIONI.su);
+  }
+
+  // Ripartiamo da qui: così si può fare una "L" senza staccare il dito
+  inizioTocco = { x: dito.clientX, y: dito.clientY };
+}, { passive: false });
+
+// Il dito si stacca (o il tocco viene interrotto): dimentichiamo il punto di partenza
+areaGioco.addEventListener("touchend", function () {
+  inizioTocco = null;
+});
+areaGioco.addEventListener("touchcancel", function () {
+  inizioTocco = null;
+});
+
+// --- Pulsanti freccia ---
+// Usiamo "pointerdown" (il dito appena tocca il pulsante) invece di "click"
+// (che arriva solo quando il dito si stacca): così il serpente gira subito.
+document.querySelectorAll(".freccia").forEach(function (pulsante) {
+  pulsante.addEventListener("pointerdown", function (evento) {
+    evento.preventDefault();
+    // pulsante.dataset.direzione legge l'attributo data-direzione dell'HTML
+    cambiaDirezione(DIREZIONI[pulsante.dataset.direzione]);
+  });
+});
+
+// --- Ricominciare ---
+
+// Toccare (o cliccare) il riquadro di fine partita fa ricominciare.
+// Aspettiamo però mezzo secondo dalla fine: se il giocatore stava toccando
+// lo schermo proprio mentre ha perso, non vogliamo ripartire per sbaglio.
+riquadroMessaggio.addEventListener("click", function () {
+  if (partitaFinita && performance.now() - istanteFinePartita > 500) {
+    iniziaPartita();
   }
 });
 

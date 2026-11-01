@@ -3,7 +3,7 @@
 <head>
   <!-- Codifica dei caratteri: serve per mostrare bene le lettere accentate -->
   <meta charset="UTF-8">
-  <!-- Adatta la pagina alla larghezza dello schermo (utile anche su telefono) -->
+  <!-- Adatta la pagina alla larghezza dello schermo (indispensabile sul telefono) -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Snake</title>
   <!-- Colleghiamo il foglio di stile che decide l'aspetto della pagina -->
@@ -23,8 +23,9 @@
       <button id="pulsante-ricomincia" type="button">Ricomincia</button>
     </div>
 
-    <!-- Zona di gioco: il "canvas" è una tela su cui JavaScript disegna -->
-    <div class="area-gioco">
+    <!-- Zona di gioco: il "canvas" è una tela su cui JavaScript disegna.
+         Sul telefono, scorrendo il dito qui sopra si cambia direzione. -->
+    <div class="area-gioco" id="area-gioco">
       <canvas id="tela" width="400" height="400"></canvas>
 
       <!-- Riquadro che compare sopra la tela a fine partita -->
@@ -32,12 +33,25 @@
         <p id="testo-messaggio">Game over!</p>
         <!-- Compare solo se in questa partita hai battuto il record -->
         <p id="nuovo-record" class="nascosto">Nuovo record!</p>
-        <p class="suggerimento">Premi <kbd>Spazio</kbd> o il pulsante "Ricomincia" per giocare ancora</p>
+        <!-- Due versioni del suggerimento: il CSS mostra quella giusta
+             per il computer ("solo-tastiera") o per il telefono ("solo-touch") -->
+        <p class="suggerimento solo-tastiera">Premi <kbd>Spazio</kbd> o il pulsante "Ricomincia" per giocare ancora</p>
+        <p class="suggerimento solo-touch">Tocca qui per giocare ancora</p>
       </div>
     </div>
 
+    <!-- Pulsanti freccia: compaiono solo sui dispositivi touch (vedi style.css).
+         "data-direzione" dice a JavaScript quale direzione indica ogni pulsante. -->
+    <div class="pulsanti-direzione solo-touch">
+      <button type="button" class="freccia freccia-su" data-direzione="su" aria-label="Su">▲</button>
+      <button type="button" class="freccia freccia-sinistra" data-direzione="sinistra" aria-label="Sinistra">◀</button>
+      <button type="button" class="freccia freccia-giu" data-direzione="giu" aria-label="Giù">▼</button>
+      <button type="button" class="freccia freccia-destra" data-direzione="destra" aria-label="Destra">▶</button>
+    </div>
+
     <!-- <kbd> indica un tasto della tastiera: nel CSS lo disegniamo come un tastino -->
-    <p class="istruzioni">Usa le frecce <kbd>↑</kbd> <kbd>↓</kbd> <kbd>←</kbd> <kbd>→</kbd> per muovere il serpente</p>
+    <p class="istruzioni solo-tastiera">Usa le frecce <kbd>↑</kbd> <kbd>↓</kbd> <kbd>←</kbd> <kbd>→</kbd> per muovere il serpente</p>
+    <p class="istruzioni solo-touch">Scorri il dito sul campo o usa i pulsanti</p>
   </main>
 
   <!-- Il codice del gioco. Lo mettiamo in fondo così la pagina è già pronta quando parte -->

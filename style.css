@@ -1,3 +1,15 @@
+/* ===== Misure condivise ===== */
+
+/* "--lato-campo" è una variabile CSS: la grandezza del campo di gioco sullo schermo.
+   "min(...)" sceglie il valore più piccolo tra quelli indicati:
+   - 400px, la grandezza normale sul computer;
+   - la larghezza dello schermo (100vw) meno 44px di margini (16px per lato
+     intorno alla pagina + 6px per lato di cornice).
+   Così sul telefono il campo si restringe e ci sta sempre tutto in larghezza. */
+:root {
+  --lato-campo: min(400px, calc(100vw - 44px));
+}
+
 /* ===== Aspetto generale della pagina ===== */
 
 /* Sfondo con una sfumatura scura, testo chiaro e contenuto al centro dello schermo.
@@ -39,9 +51,9 @@ h1 {
 
 /* ===== Barra con punteggio e pulsante ===== */
 
-/* Punteggio a sinistra, pulsante a destra, larga quanto la tela */
+/* Punteggio a sinistra, pulsante a destra, larga quanto il campo con la cornice */
 .barra {
-  width: 400px;
+  width: calc(var(--lato-campo) + 12px);
   max-width: 100%;
   display: flex;
   justify-content: space-between;
@@ -110,10 +122,14 @@ button {
   transition: transform 0.1s, box-shadow 0.2s;
 }
 
-/* Quando ci passa sopra il mouse il pulsante si solleva un po' */
-button:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 18px rgba(35, 168, 90, 0.55);
+/* Quando ci passa sopra il mouse il pulsante si solleva un po'.
+   "(hover: hover)" vuol dire "solo se c'è un mouse": sul telefono, senza
+   questa condizione, il pulsante resterebbe sollevato dopo averlo toccato. */
+@media (hover: hover) {
+  button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 18px rgba(35, 168, 90, 0.55);
+  }
 }
 
 /* Quando lo premi torna giù */
@@ -134,14 +150,16 @@ button:active {
     0 0 0 1px rgba(255, 255, 255, 0.08),
     0 20px 50px rgba(0, 0, 0, 0.6),
     0 0 40px rgba(76, 217, 123, 0.15);
+  /* Sul campo il dito serve per giocare: diciamo al browser di non usarlo
+     per scorrere la pagina o fare zoom */
+  touch-action: none;
 }
 
-/* La tela è larga 400 pixel ma si rimpicciolisce sugli schermi stretti,
-   restando sempre quadrata ("aspect-ratio: 1") */
+/* La tela è grande quanto "--lato-campo" (400 pixel sul computer, meno sul
+   telefono) e resta sempre quadrata ("aspect-ratio: 1") */
 canvas {
   display: block;
-  width: 400px;
-  max-width: 100%;
+  width: var(--lato-campo);
   height: auto;
   aspect-ratio: 1;
   border-radius: 10px;
@@ -226,4 +244,133 @@ kbd {
   border: 1px solid rgba(255, 255, 255, 0.18);
   border-bottom-width: 3px;
   border-radius: 5px;
+}
+
+/* ===== Pulsanti freccia (per il telefono) ===== */
+
+/* Le quattro frecce sono disposte a croce su una griglia di 3 colonne e 2 righe:
+   la freccia "su" in alto al centro, le altre tre sotto. */
+.pulsanti-direzione {
+  display: grid;
+  grid-template-columns: repeat(3, 64px);
+  grid-template-rows: repeat(2, 56px);
+  grid-template-areas:
+    ".        su  .     "
+    "sinistra giu destra";
+  gap: 8px;
+  /* Evita che tenendo premuto il dito si selezioni il testo delle frecce */
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.freccia-su       { grid-area: su; }
+.freccia-sinistra { grid-area: sinistra; }
+.freccia-giu      { grid-area: giu; }
+.freccia-destra   { grid-area: destra; }
+
+.freccia {
+  padding: 0;
+  font-size: 22px;
+  border-radius: 16px;
+  /* "manipulation" toglie lo zoom con il doppio tocco, così i pulsanti rispondono subito */
+  touch-action: manipulation;
+  /* Toglie il riquadro colorato che alcuni telefoni mostrano quando tocchi */
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Quando la freccia è premuta diventa più chiara e si abbassa */
+.freccia:active {
+  transform: scale(0.94);
+  background: linear-gradient(180deg, #8af0a9, #3cc874);
+}
+
+/* ===== Computer o telefono? ===== */
+
+/* Alcuni elementi servono solo col dito ("solo-touch"), altri solo con la
+   tastiera ("solo-tastiera"). Normalmente (sul computer) nascondiamo quelli touch. */
+.solo-touch {
+  display: none;
+}
+
+/* "(hover: none) and (pointer: coarse)" vuol dire: niente mouse e un puntatore
+   "grossolano", cioè un dito. In pratica: telefoni e tablet. */
+@media (hover: none) and (pointer: coarse) {
+  .solo-tastiera {
+    display: none;
+  }
+
+  p.solo-touch {
+    display: block;
+  }
+
+  .pulsanti-direzione.solo-touch {
+    display: grid;
+  }
+
+  /* Sul telefono sotto il campo ci sono anche le frecce: il campo deve
+     lasciare spazio in altezza (circa 300px) a titolo, punteggio e frecce.
+     "100vh" è l'altezza dello schermo; "100dvh" è la stessa cosa ma tiene
+     conto delle barre del browser che compaiono e spariscono. I browser che
+     non conoscono "dvh" ignorano la seconda riga e usano la prima.
+     "max(220px, ...)" impedisce che il campo diventi troppo piccolo. */
+  :root {
+    --lato-campo: min(400px, calc(100vw - 44px), max(220px, calc(100vh - 300px)));
+    --lato-campo: min(400px, calc(100vw - 44px), max(220px, calc(100dvh - 300px)));
+  }
+}
+
+/* ===== Schermi piccoli ===== */
+
+/* Sotto i 480 pixel di larghezza riduciamo titolo, spazi e scritte */
+@media (max-width: 480px) {
+  .contenitore {
+    gap: 10px;
+    padding: 12px 16px;
+  }
+
+  h1 {
+    font-size: 30px;
+    letter-spacing: 4px;
+  }
+
+  .barra p {
+    padding: 6px 10px;
+    font-size: 15px;
+  }
+
+  button {
+    padding: 8px 14px;
+    font-size: 15px;
+  }
+
+  .freccia {
+    font-size: 20px;
+  }
+
+  #testo-messaggio {
+    font-size: 32px;
+  }
+}
+
+/* Telefoni molto stretti (meno di 360 pixel): scritte e spazi ancora più piccoli,
+   così punteggio, record e pulsante stanno su una riga sola */
+@media (max-width: 359px) {
+  .punteggi,
+  .barra {
+    gap: 6px;
+  }
+
+  .barra p {
+    padding: 5px 8px;
+    font-size: 13px;
+  }
+
+  button {
+    padding: 7px 10px;
+    font-size: 13px;
+  }
+
+  .istruzioni {
+    font-size: 14px;
+  }
 }

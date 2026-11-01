@@ -24,8 +24,17 @@ const CELLE_PER_LATO = 20;
 // quindi un numero più BASSO vuol dire un serpente più VELOCE.
 const VELOCITA_INIZIALE_MS = 120; // all'inizio della partita
 const VELOCITA_MASSIMA_MS = 60;   // il serpente non andrà mai più veloce di così
-const ACCELERAZIONE_MS = 8;       // di quanto si accorcia il tempo a ogni accelerazione
-const MELE_PER_ACCELERARE = 5;    // ogni quante mele mangiate il serpente accelera
+const ACCELERAZIONE_MS = 8;       // di quanto si accorcia il tempo a ogni livello
+
+// Livelli: ogni MELE_PER_LIVELLO mele si sale di livello. A ogni livello
+// il serpente accelera e sul campo compaiono nuove pietre da evitare.
+const MELE_PER_LIVELLO = 5;
+
+// Pietre (ostacoli): se la testa ne tocca una, la partita finisce
+const PIETRE_INIZIALI = 3;     // quante pietre ci sono al livello 1
+const PIETRE_PER_LIVELLO = 2;  // quante pietre si aggiungono a ogni nuovo livello
+const PIETRE_MASSIME = 30;     // oltre questo numero non se ne aggiungono più
+const DISTANZA_SICURA = 4;     // una pietra nuova compare ad almeno 4 celle dalla testa
 
 // Grandezza del campo di gioco in pixel
 const DIMENSIONE_CAMPO = 400;
@@ -86,7 +95,10 @@ let istanteUltimoPasso;  // quando è avvenuto l'ultimo passo (in millisecondi)
 let particelle = [];     // scintille che volano via quando il serpente mangia
 let scossaFinoA = 0;     // fino a quando il campo deve tremare (dopo un game over)
 let tempoPasso;          // millisecondi tra un passo e l'altro (scende quando il serpente accelera)
-let scrittaVelocitaFinoA = 0; // fino a quando mostrare la scritta "Più veloce!"
+let livello;             // il livello attuale: parte da 1 e sale ogni MELE_PER_LIVELLO mele
+let pietre = [];         // lista delle pietre sul campo: {x, y, nataAlle, variante}
+let scrittaLivelloFinoA = 0;  // fino a quando mostrare la scritta "Livello ..."
+let sottotitoloLivello = "";  // cosa è cambiato col nuovo livello (es. "Più veloce! · Nuove pietre")
 let record = leggiRecord(); // il punteggio migliore di sempre
 let recordBattuto;       // true se in questa partita il record è stato superato
 let istanteFinePartita = 0; // quando è finita l'ultima partita (in millisecondi)
@@ -139,10 +151,15 @@ function iniziaPartita() {
   partitaFinita = false;
   particelle = [];
   scossaFinoA = 0;
-  scrittaVelocitaFinoA = 0;
+  scrittaLivelloFinoA = 0;
   recordBattuto = false;
   tempoPasso = VELOCITA_INIZIALE_MS; // ogni partita riparte alla velocità iniziale
+  livello = 1;
   istanteUltimoPasso = performance.now();
+
+  // Prima le pietre, poi il cibo: così il cibo non finisce mai sopra una pietra
+  pietre = [];
+  aggiungiPietre(PIETRE_INIZIALI);
 
   aggiornaPunteggio();
   posizionaCibo();
@@ -159,20 +176,35 @@ function avviaCronometro() {
   timerGioco = setInterval(passoDiGioco, tempoPasso);
 }
 
-// Ogni MELE_PER_ACCELERARE mele il serpente diventa un po' più veloce.
+// Ogni MELE_PER_LIVELLO mele si sale di livello.
 // L'operatore % dà il resto della divisione: "punteggio % 5 === 0" è vero
 // quando il punteggio è 5, 10, 15, 20...
-function controllaAccelerazione() {
-  if (punteggio % MELE_PER_ACCELERARE !== 0 || tempoPasso <= VELOCITA_MASSIMA_MS) {
-    return; // non è il momento di accelerare, oppure siamo già al massimo
+function controllaLivello() {
+  if (punteggio % MELE_PER_LIVELLO !== 0) {
+    return; // non è ancora il momento di cambiare livello
   }
 
-  // Math.max impedisce di scendere sotto la velocità massima
-  tempoPasso = Math.max(VELOCITA_MASSIMA_MS, tempoPasso - ACCELERAZIONE_MS);
-  avviaCronometro(); // ripartiamo con il nuovo tempo tra un passo e l'altro
+  livello++;
+  const novita = []; // qui raccogliamo cosa cambia, per scriverlo sullo schermo
 
-  // Mostriamo la scritta "Più veloce!" per un secondo
-  scrittaVelocitaFinoA = performance.now() + 1000;
+  // 1) Il serpente accelera, se non è già alla velocità massima.
+  //    Math.max impedisce di scendere sotto la velocità massima.
+  if (tempoPasso > VELOCITA_MASSIMA_MS) {
+    tempoPasso = Math.max(VELOCITA_MASSIMA_MS, tempoPasso - ACCELERAZIONE_MS);
+    avviaCronometro(); // ripartiamo con il nuovo tempo tra un passo e l'altro
+    novita.push("Più veloce!");
+  }
+
+  // 2) Compaiono nuove pietre, se non sono già al numero massimo
+  const quantePietre = Math.min(PIETRE_PER_LIVELLO, PIETRE_MASSIME - pietre.length);
+  if (quantePietre > 0 && aggiungiPietre(quantePietre) > 0) {
+    novita.push("Nuove pietre");
+  }
+
+  // Mostriamo la scritta "Livello ..." per un secondo e mezzo.
+  // join(" · ") unisce le novità in un'unica frase separata da puntini.
+  sottotitoloLivello = novita.join(" · ");
+  scrittaLivelloFinoA = performance.now() + 1500;
 }
 
 // Crea una copia del serpente (una lista nuova con celle nuove).
@@ -186,13 +218,13 @@ function copiaSerpente(lista) {
 
 // ---------- 5. Il cibo ----------
 
-// Mette il cibo in una cella casuale che non sia occupata dal serpente
+// Mette il cibo in una cella casuale che non sia occupata dal serpente o da una pietra
 function posizionaCibo() {
   // Prima raccogliamo tutte le celle libere...
   const celleLibere = [];
   for (let x = 0; x < CELLE_PER_LATO; x++) {
     for (let y = 0; y < CELLE_PER_LATO; y++) {
-      if (!occupataDalSerpente(x, y)) {
+      if (!occupataDalSerpente(x, y) && !occupataDaPietra(x, y)) {
         celleLibere.push({ x: x, y: y });
       }
     }
@@ -214,6 +246,129 @@ function occupataDalSerpente(x, y) {
   return serpente.some(function (pezzo) {
     return pezzo.x === x && pezzo.y === y;
   });
+}
+
+// Restituisce true se nella cella (x, y) c'è una pietra
+function occupataDaPietra(x, y) {
+  return pietre.some(function (pietra) {
+    return pietra.x === x && pietra.y === y;
+  });
+}
+
+
+// ---------- 5b. Le pietre ----------
+
+// Aggiunge "quante" pietre in posizioni casuali ma "giuste" per il giocatore.
+// Restituisce quante ne è riuscita ad aggiungere davvero (se il campo è
+// molto pieno potrebbero essere meno di quelle richieste).
+function aggiungiPietre(quante) {
+  let aggiunte = 0;
+
+  for (let i = 0; i < quante; i++) {
+    // Mescoliamo le celle possibili e proviamo una alla volta finché
+    // ne troviamo una che non chiude nessuna zona del campo
+    const candidate = mescola(celleAdattePerPietra());
+    let trovata = false;
+
+    for (let j = 0; j < candidate.length && !trovata; j++) {
+      const cella = candidate[j];
+      // Proviamo a mettere la pietra...
+      pietre.push({
+        x: cella.x,
+        y: cella.y,
+        nataAlle: performance.now(),  // serve per l'animazione di comparsa
+        variante: Math.random()       // rende ogni pietra un po' diversa dalle altre
+      });
+      // ...e se chiude una zona la togliamo e passiamo alla cella dopo
+      if (campoTuttoRaggiungibile()) {
+        trovata = true;
+        aggiunte++;
+      } else {
+        pietre.pop();
+      }
+    }
+
+    if (!trovata) {
+      break; // non c'è più posto adatto: inutile continuare
+    }
+  }
+
+  return aggiunte;
+}
+
+// Raccoglie le celle dove è "giusto" mettere una pietra nuova:
+// - libere (niente serpente, pietre o cibo);
+// - lontane dalla testa almeno DISTANZA_SICURA passi;
+// - non sulla linea davanti alla testa, fino al bordo: così una pietra
+//   non compare mai all'improvviso proprio dove il serpente sta andando.
+function celleAdattePerPietra() {
+  const testa = serpente[0];
+  const celle = [];
+
+  for (let x = 0; x < CELLE_PER_LATO; x++) {
+    for (let y = 0; y < CELLE_PER_LATO; y++) {
+      const libera = !occupataDalSerpente(x, y) && !occupataDaPietra(x, y) &&
+        !(cibo && cibo.x === x && cibo.y === y);
+
+      // Distanza "a passi" (senza diagonali) tra la cella e la testa
+      const distanza = Math.abs(x - testa.x) + Math.abs(y - testa.y);
+
+      // È davanti alla testa? Vero se sta sulla stessa riga (o colonna)
+      // e dal lato verso cui il serpente si muove
+      const davanti =
+        (direzione.x !== 0 && y === testa.y && (x - testa.x) * direzione.x > 0) ||
+        (direzione.y !== 0 && x === testa.x && (y - testa.y) * direzione.y > 0);
+
+      if (libera && distanza >= DISTANZA_SICURA && !davanti) {
+        celle.push({ x: x, y: y });
+      }
+    }
+  }
+  return celle;
+}
+
+// Controlla che, partendo dalla testa, si possa raggiungere OGNI cella
+// senza pietre. Se una pietra chiudesse un angolo o una zona, il cibo
+// potrebbe comparire lì dentro e il giocatore non potrebbe mai prenderlo.
+// Funziona come una macchia d'inchiostro che si allarga: si parte dalla
+// testa e si "colorano" via via le celle vicine finché si può.
+function campoTuttoRaggiungibile() {
+  const testa = serpente[0];
+  const visitate = new Set();         // celle già raggiunte, scritte come "x,y"
+  const daVisitare = [testa];
+  visitate.add(testa.x + "," + testa.y);
+
+  while (daVisitare.length > 0) {
+    const cella = daVisitare.pop();
+    // Le 4 celle vicine: destra, sinistra, sotto, sopra
+    const vicine = [
+      { x: cella.x + 1, y: cella.y }, { x: cella.x - 1, y: cella.y },
+      { x: cella.x, y: cella.y + 1 }, { x: cella.x, y: cella.y - 1 }
+    ];
+    vicine.forEach(function (v) {
+      const dentroIlCampo = v.x >= 0 && v.x < CELLE_PER_LATO && v.y >= 0 && v.y < CELLE_PER_LATO;
+      const chiave = v.x + "," + v.y;
+      if (dentroIlCampo && !visitate.has(chiave) && !occupataDaPietra(v.x, v.y)) {
+        visitate.add(chiave);
+        daVisitare.push(v);
+      }
+    });
+  }
+
+  // Tutte le celle senza pietre devono essere state raggiunte
+  const celleSenzaPietre = CELLE_PER_LATO * CELLE_PER_LATO - pietre.length;
+  return visitate.size === celleSenzaPietre;
+}
+
+// Rimescola una lista in ordine casuale (come mescolare un mazzo di carte)
+function mescola(lista) {
+  for (let i = lista.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const scambio = lista[i];
+    lista[i] = lista[j];
+    lista[j] = scambio;
+  }
+  return lista;
 }
 
 
@@ -252,7 +407,10 @@ function passoDiGioco() {
     return pezzo.x === nuovaTesta.x && pezzo.y === nuovaTesta.y;
   });
 
-  if (fuoriDalCampo || toccaSeStesso) {
+  // Controllo 3: la testa va a sbattere contro una pietra?
+  const toccaPietra = occupataDaPietra(nuovaTesta.x, nuovaTesta.y);
+
+  if (fuoriDalCampo || toccaSeStesso || toccaPietra) {
     finePartita("Game over!", false);
     return;
   }
@@ -266,7 +424,7 @@ function passoDiGioco() {
     aggiornaPunteggio();
     creaParticelle(cibo.x, cibo.y);
     posizionaCibo();
-    controllaAccelerazione();
+    controllaLivello();
 
     // Se non c'è più spazio per il cibo, il giocatore ha vinto
     if (cibo === null) {
@@ -378,34 +536,112 @@ function disegna(istante) {
   }
 
   disegnaCampo();
+  disegnaPietre(istante);
   disegnaCibo(istante);
   disegnaSerpente(istante);
   disegnaParticelle();
-  disegnaScrittaVelocita(istante);
+  disegnaScrittaLivello(istante);
 
   pennello.restore();
 }
 
-// Quando il serpente accelera, compare in alto la scritta "Più veloce!"
-// che sale un pochino e svanisce nel giro di un secondo
-function disegnaScrittaVelocita(istante) {
-  if (istante >= scrittaVelocitaFinoA) {
+// Quando si sale di livello, compare in alto la scritta "Livello N" con
+// sotto cosa è cambiato; sale un pochino e svanisce in un secondo e mezzo
+function disegnaScrittaLivello(istante) {
+  if (istante >= scrittaLivelloFinoA) {
     return;
   }
 
   // "rimasto" va da 1 (appena comparsa) a 0 (sta per sparire)
-  const rimasto = (scrittaVelocitaFinoA - istante) / 1000;
+  const rimasto = (scrittaLivelloFinoA - istante) / 1500;
+  // La scritta parte a 70 pixel dall'alto e sale di 20 pixel mentre svanisce
+  const altezza = 50 + rimasto * 20;
 
   pennello.save();
-  pennello.globalAlpha = Math.min(1, rimasto * 2); // nell'ultimo mezzo secondo svanisce
-  pennello.font = "bold 26px 'Segoe UI', Arial, sans-serif";
+  pennello.globalAlpha = Math.min(1, rimasto * 2); // nell'ultima parte svanisce
   pennello.textAlign = "center";
   pennello.fillStyle = "#ffd166";
-  pennello.shadowColor = "rgba(0, 0, 0, 0.6)";
+  pennello.shadowColor = "rgba(0, 0, 0, 0.7)";
   pennello.shadowBlur = 6;
-  // La scritta parte a 70 pixel dall'alto e sale di 20 pixel mentre svanisce
-  pennello.fillText("Più veloce!", DIMENSIONE_CAMPO / 2, 50 + rimasto * 20);
+
+  pennello.font = "bold 28px 'Segoe UI', Arial, sans-serif";
+  pennello.fillText("Livello " + livello, DIMENSIONE_CAMPO / 2, altezza);
+
+  if (sottotitoloLivello !== "") {
+    pennello.font = "bold 16px 'Segoe UI', Arial, sans-serif";
+    pennello.fillStyle = "#ffffff";
+    pennello.fillText(sottotitoloLivello, DIMENSIONE_CAMPO / 2, altezza + 24);
+  }
   pennello.restore();
+}
+
+// Disegna le pietre: blocchi grigi in rilievo. Quando una pietra è appena
+// comparsa, "cresce" dal centro della cella, così il giocatore la nota.
+function disegnaPietre(istante) {
+  pietre.forEach(function (pietra) {
+    // "eta" va da 0 (appena nata) a 1 (dopo 400 millisecondi)
+    const eta = Math.min(1, (istante - pietra.nataAlle) / 400);
+    // Crescita veloce all'inizio e più lenta alla fine (sembra più naturale)
+    const scala = 1 - Math.pow(1 - eta, 3);
+    if (scala <= 0) {
+      return;
+    }
+
+    const lato = (LATO_CELLA - 2) * scala;
+    const centroX = pietra.x * LATO_CELLA + LATO_CELLA / 2;
+    const centroY = pietra.y * LATO_CELLA + LATO_CELLA / 2;
+    const sinistra = centroX - lato / 2;
+    const alto = centroY - lato / 2;
+
+    // Una pietra appena nata ha un alone chiaro che svanisce
+    if (eta < 1) {
+      pennello.save();
+      pennello.shadowColor = "rgba(255, 255, 255, " + (1 - eta) + ")";
+      pennello.shadowBlur = 14;
+      pennello.fillStyle = "#4a515e";
+      rettangoloArrotondato(sinistra, alto, lato, lato, 5 * scala);
+      pennello.fill();
+      pennello.restore();
+    }
+
+    // Base scura: è il "fianco" della pietra, che si vede sotto
+    pennello.fillStyle = "#4a515e";
+    rettangoloArrotondato(sinistra, alto, lato, lato, 5 * scala);
+    pennello.fill();
+
+    // Faccia superiore più chiara, un po' più in alto: dà l'effetto rilievo
+    pennello.fillStyle = "#8b94a3";
+    rettangoloArrotondato(sinistra + 1, alto + 1, lato - 2, lato - 4 * scala, 4 * scala);
+    pennello.fill();
+
+    // Riflesso in alto a sinistra
+    pennello.fillStyle = "rgba(255, 255, 255, 0.25)";
+    rettangoloArrotondato(sinistra + 3 * scala, alto + 3 * scala, lato * 0.35, lato * 0.2, 2 * scala);
+    pennello.fill();
+
+    // Una piccola crepa, inclinata in modo diverso per ogni pietra
+    const angolo = pietra.variante * Math.PI;
+    const lunghezza = lato * 0.25;
+    pennello.strokeStyle = "rgba(40, 44, 52, 0.7)";
+    pennello.lineWidth = 1.2;
+    pennello.beginPath();
+    pennello.moveTo(centroX - Math.cos(angolo) * lunghezza, centroY + 1 - Math.sin(angolo) * lunghezza);
+    pennello.lineTo(centroX + 1, centroY + 2);
+    pennello.lineTo(centroX + Math.cos(angolo) * lunghezza, centroY + 1 + Math.sin(angolo) * lunghezza * 0.5);
+    pennello.stroke();
+  });
+}
+
+// Prepara il contorno di un rettangolo con gli angoli arrotondati
+// (poi basta chiamare fill() per colorarlo). "raggio" è quanto sono tondi gli angoli.
+function rettangoloArrotondato(x, y, larghezza, altezza, raggio) {
+  pennello.beginPath();
+  pennello.moveTo(x + raggio, y);
+  pennello.arcTo(x + larghezza, y, x + larghezza, y + altezza, raggio);
+  pennello.arcTo(x + larghezza, y + altezza, x, y + altezza, raggio);
+  pennello.arcTo(x, y + altezza, x, y, raggio);
+  pennello.arcTo(x, y, x + larghezza, y, raggio);
+  pennello.closePath();
 }
 
 // Il campo è una scacchiera di caselle verdi chiare e scure

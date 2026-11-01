@@ -1,5 +1,5 @@
 // =====================================================================
-// SNAKE - il codice del gioco
+// SNAKEC - il codice del gioco
 // =====================================================================
 // Idea di base: il campo è una griglia di quadratini (celle).
 // Il serpente è una lista di celle; ogni "passo" del gioco aggiungiamo

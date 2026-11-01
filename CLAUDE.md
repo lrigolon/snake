@@ -1,4 +1,4 @@
-# Snake
+# SnakeC
 
 Gioco Snake che gira nel browser.
 

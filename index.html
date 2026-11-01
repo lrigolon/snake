@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <!-- Codifica dei caratteri: serve per mostrare bene le lettere accentate -->
+  <meta charset="UTF-8">
+  <!-- Adatta la pagina alla larghezza dello schermo (utile anche su telefono) -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Snake</title>
+  <!-- Colleghiamo il foglio di stile che decide l'aspetto della pagina -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="contenitore">
+    <h1>Snake</h1>
+
+    <!-- Barra con punteggio, record e pulsante per ricominciare -->
+    <div class="barra">
+      <div class="punteggi">
+        <p>Punteggio: <span id="punteggio">0</span></p>
+        <!-- Il record è il punteggio migliore di sempre: resta salvato anche chiudendo il browser -->
+        <p>Record: <span id="record">0</span></p>
+      </div>
+      <button id="pulsante-ricomincia" type="button">Ricomincia</button>
+    </div>
+
+    <!-- Zona di gioco: il "canvas" è una tela su cui JavaScript disegna -->
+    <div class="area-gioco">
+      <canvas id="tela" width="400" height="400"></canvas>
+
+      <!-- Riquadro che compare sopra la tela a fine partita -->
+      <div id="messaggio" class="messaggio nascosto">
+        <p id="testo-messaggio">Game over!</p>
+        <!-- Compare solo se in questa partita hai battuto il record -->
+        <p id="nuovo-record" class="nascosto">Nuovo record!</p>
+        <p class="suggerimento">Premi <kbd>Spazio</kbd> o il pulsante "Ricomincia" per giocare ancora</p>
+      </div>
+    </div>
+
+    <!-- <kbd> indica un tasto della tastiera: nel CSS lo disegniamo come un tastino -->
+    <p class="istruzioni">Usa le frecce <kbd>↑</kbd> <kbd>↓</kbd> <kbd>←</kbd> <kbd>→</kbd> per muovere il serpente</p>
+  </main>
+
+  <!-- Il codice del gioco. Lo mettiamo in fondo così la pagina è già pronta quando parte -->
+  <script src="script.js"></script>
+</body>
+</html>

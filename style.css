@@ -1,0 +1,229 @@
+/* ===== Aspetto generale della pagina ===== */
+
+/* Sfondo con una sfumatura scura, testo chiaro e contenuto al centro dello schermo.
+   Usiamo solo font già presenti nel computer, così tutto funziona offline. */
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at 50% 20%, #24334a 0%, #121a26 60%, #0b1018 100%);
+  color: #e8eef5;
+  font-family: "Segoe UI", "Trebuchet MS", Arial, sans-serif;
+}
+
+/* Colonna che contiene titolo, punteggio, gioco e istruzioni */
+.contenitore {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+}
+
+/* Titolo con le lettere colorate da una sfumatura dal verde chiaro al verde scuro */
+h1 {
+  margin: 0;
+  font-size: 48px;
+  font-weight: 800;
+  letter-spacing: 6px;
+  text-transform: uppercase;
+  background: linear-gradient(90deg, #c6f36b, #4cd97b, #1fa463);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  /* Un leggero alone verde intorno al titolo */
+  filter: drop-shadow(0 0 12px rgba(76, 217, 123, 0.35));
+}
+
+/* ===== Barra con punteggio e pulsante ===== */
+
+/* Punteggio a sinistra, pulsante a destra, larga quanto la tela */
+.barra {
+  width: 400px;
+  max-width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  /* Sugli schermi stretti il pulsante può andare a capo */
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* Punteggio e record stanno uno accanto all'altro */
+.punteggi {
+  display: flex;
+  gap: 8px;
+}
+
+/* Punteggio e record stanno ciascuno in una "pillola" semitrasparente */
+.barra p {
+  margin: 0;
+  padding: 8px 14px;
+  font-size: 17px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+}
+
+#punteggio {
+  display: inline-block;
+  min-width: 2ch;
+  font-weight: 700;
+  color: #c6f36b;
+}
+
+/* Il record è color oro */
+#record {
+  display: inline-block;
+  min-width: 2ch;
+  font-weight: 700;
+  color: #ffd166;
+}
+
+/* Animazione dei numeri: quando salgono fanno un piccolo "salto".
+   JavaScript aggiunge la classe "salto" al punteggio ogni volta che il
+   serpente mangia, e al record quando viene superato. */
+.salto {
+  animation: salto 0.3s ease-out;
+}
+
+@keyframes salto {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.5); color: #ffffff; }
+  100% { transform: scale(1); }
+}
+
+/* Pulsante con sfumatura verde e angoli arrotondati */
+button {
+  padding: 10px 20px;
+  font-size: 16px;
+  font-weight: 600;
+  font-family: inherit;
+  border: none;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #5fe08a, #23a85a);
+  color: #0b1a10;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(35, 168, 90, 0.4);
+  transition: transform 0.1s, box-shadow 0.2s;
+}
+
+/* Quando ci passa sopra il mouse il pulsante si solleva un po' */
+button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(35, 168, 90, 0.55);
+}
+
+/* Quando lo premi torna giù */
+button:active {
+  transform: translateY(1px);
+}
+
+/* ===== Zona di gioco ===== */
+
+/* "position: relative" permette di sovrapporre il messaggio alla tela */
+.area-gioco {
+  position: relative;
+  border-radius: 14px;
+  /* Cornice luminosa e ombra: il campo sembra "staccato" dallo sfondo */
+  padding: 6px;
+  background: linear-gradient(145deg, #3a5a40, #1d3324);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.08),
+    0 20px 50px rgba(0, 0, 0, 0.6),
+    0 0 40px rgba(76, 217, 123, 0.15);
+}
+
+/* La tela è larga 400 pixel ma si rimpicciolisce sugli schermi stretti,
+   restando sempre quadrata ("aspect-ratio: 1") */
+canvas {
+  display: block;
+  width: 400px;
+  max-width: 100%;
+  height: auto;
+  aspect-ratio: 1;
+  border-radius: 10px;
+}
+
+/* Riquadro che copre la tela a fine partita: sfondo scuro e un po' sfocato */
+.messaggio {
+  position: absolute;
+  inset: 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 16px;
+  background: rgba(8, 14, 20, 0.65);
+  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(3px);
+  border-radius: 10px;
+  animation: comparsa 0.35s ease-out;
+}
+
+/* Il messaggio compare dolcemente, crescendo un poco */
+@keyframes comparsa {
+  from { opacity: 0; transform: scale(0.95); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+#testo-messaggio {
+  margin: 0 0 10px;
+  font-size: 40px;
+  font-weight: 800;
+  color: #ff6b6b;
+  text-shadow: 0 0 18px rgba(255, 107, 107, 0.5);
+}
+
+/* Se il giocatore vince, il messaggio diventa verde invece che rosso */
+#testo-messaggio.vittoria {
+  color: #c6f36b;
+  text-shadow: 0 0 18px rgba(198, 243, 107, 0.5);
+}
+
+/* Scritta "Nuovo record!" dorata, che pulsa per farsi notare */
+#nuovo-record {
+  margin: 0 0 12px;
+  font-size: 20px;
+  font-weight: 700;
+  color: #ffd166;
+  text-shadow: 0 0 14px rgba(255, 209, 102, 0.6);
+  animation: pulsa 1s ease-in-out infinite;
+}
+
+@keyframes pulsa {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.08); }
+}
+
+.suggerimento {
+  margin: 0;
+  font-size: 15px;
+  color: #c3ccd6;
+}
+
+/* Classe usata da JavaScript per nascondere il messaggio durante la partita */
+.nascosto {
+  display: none;
+}
+
+/* Istruzioni in basso; i nomi dei tasti sembrano piccoli tasti veri */
+.istruzioni {
+  margin: 0;
+  color: #8d99a8;
+}
+
+kbd {
+  display: inline-block;
+  padding: 2px 7px;
+  font-family: inherit;
+  font-size: 13px;
+  color: #e8eef5;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-bottom-width: 3px;
+  border-radius: 5px;
+}

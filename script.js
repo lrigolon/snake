@@ -20,8 +20,12 @@
 // Quante celle ci sono per lato (la griglia è quadrata: 20 x 20)
 const CELLE_PER_LATO = 20;
 
-// Ogni quanti millisecondi il serpente fa un passo (più basso = più veloce)
-const VELOCITA_MS = 120;
+// Velocità del serpente: è il tempo in millisecondi tra un passo e l'altro,
+// quindi un numero più BASSO vuol dire un serpente più VELOCE.
+const VELOCITA_INIZIALE_MS = 120; // all'inizio della partita
+const VELOCITA_MASSIMA_MS = 60;   // il serpente non andrà mai più veloce di così
+const ACCELERAZIONE_MS = 8;       // di quanto si accorcia il tempo a ogni accelerazione
+const MELE_PER_ACCELERARE = 5;    // ogni quante mele mangiate il serpente accelera
 
 // Grandezza del campo di gioco in pixel
 const DIMENSIONE_CAMPO = 400;
@@ -81,6 +85,8 @@ let timerGioco;          // il "cronometro" che fa avanzare il gioco a ogni pass
 let istanteUltimoPasso;  // quando è avvenuto l'ultimo passo (in millisecondi)
 let particelle = [];     // scintille che volano via quando il serpente mangia
 let scossaFinoA = 0;     // fino a quando il campo deve tremare (dopo un game over)
+let tempoPasso;          // millisecondi tra un passo e l'altro (scende quando il serpente accelera)
+let scrittaVelocitaFinoA = 0; // fino a quando mostrare la scritta "Più veloce!"
 let record = leggiRecord(); // il punteggio migliore di sempre
 let recordBattuto;       // true se in questa partita il record è stato superato
 let istanteFinePartita = 0; // quando è finita l'ultima partita (in millisecondi)
@@ -133,17 +139,40 @@ function iniziaPartita() {
   partitaFinita = false;
   particelle = [];
   scossaFinoA = 0;
+  scrittaVelocitaFinoA = 0;
   recordBattuto = false;
+  tempoPasso = VELOCITA_INIZIALE_MS; // ogni partita riparte alla velocità iniziale
   istanteUltimoPasso = performance.now();
 
   aggiornaPunteggio();
   posizionaCibo();
   riquadroMessaggio.classList.add("nascosto");
 
-  // Se c'era già un cronometro attivo lo fermiamo, poi ne avviamo uno nuovo
-  // che chiama la funzione "passoDiGioco" ogni VELOCITA_MS millisecondi
+  avviaCronometro();
+}
+
+// Avvia il cronometro che chiama la funzione "passoDiGioco" ogni "tempoPasso"
+// millisecondi. Se c'era già un cronometro attivo lo fermiamo prima:
+// serve sia a inizio partita sia quando il serpente accelera.
+function avviaCronometro() {
   clearInterval(timerGioco);
-  timerGioco = setInterval(passoDiGioco, VELOCITA_MS);
+  timerGioco = setInterval(passoDiGioco, tempoPasso);
+}
+
+// Ogni MELE_PER_ACCELERARE mele il serpente diventa un po' più veloce.
+// L'operatore % dà il resto della divisione: "punteggio % 5 === 0" è vero
+// quando il punteggio è 5, 10, 15, 20...
+function controllaAccelerazione() {
+  if (punteggio % MELE_PER_ACCELERARE !== 0 || tempoPasso <= VELOCITA_MASSIMA_MS) {
+    return; // non è il momento di accelerare, oppure siamo già al massimo
+  }
+
+  // Math.max impedisce di scendere sotto la velocità massima
+  tempoPasso = Math.max(VELOCITA_MASSIMA_MS, tempoPasso - ACCELERAZIONE_MS);
+  avviaCronometro(); // ripartiamo con il nuovo tempo tra un passo e l'altro
+
+  // Mostriamo la scritta "Più veloce!" per un secondo
+  scrittaVelocitaFinoA = performance.now() + 1000;
 }
 
 // Crea una copia del serpente (una lista nuova con celle nuove).
@@ -237,6 +266,7 @@ function passoDiGioco() {
     aggiornaPunteggio();
     creaParticelle(cibo.x, cibo.y);
     posizionaCibo();
+    controllaAccelerazione();
 
     // Se non c'è più spazio per il cibo, il giocatore ha vinto
     if (cibo === null) {
@@ -351,7 +381,30 @@ function disegna(istante) {
   disegnaCibo(istante);
   disegnaSerpente(istante);
   disegnaParticelle();
+  disegnaScrittaVelocita(istante);
 
+  pennello.restore();
+}
+
+// Quando il serpente accelera, compare in alto la scritta "Più veloce!"
+// che sale un pochino e svanisce nel giro di un secondo
+function disegnaScrittaVelocita(istante) {
+  if (istante >= scrittaVelocitaFinoA) {
+    return;
+  }
+
+  // "rimasto" va da 1 (appena comparsa) a 0 (sta per sparire)
+  const rimasto = (scrittaVelocitaFinoA - istante) / 1000;
+
+  pennello.save();
+  pennello.globalAlpha = Math.min(1, rimasto * 2); // nell'ultimo mezzo secondo svanisce
+  pennello.font = "bold 26px 'Segoe UI', Arial, sans-serif";
+  pennello.textAlign = "center";
+  pennello.fillStyle = "#ffd166";
+  pennello.shadowColor = "rgba(0, 0, 0, 0.6)";
+  pennello.shadowBlur = 6;
+  // La scritta parte a 70 pixel dall'alto e sale di 20 pixel mentre svanisce
+  pennello.fillText("Più veloce!", DIMENSIONE_CAMPO / 2, 50 + rimasto * 20);
   pennello.restore();
 }
 
@@ -415,7 +468,7 @@ function disegnaCibo(istante) {
 function disegnaSerpente(istante) {
   // "frazione" dice a che punto siamo tra un passo e il successivo:
   // 0 = appena fatto il passo, 1 = è ora del passo seguente.
-  let frazione = (istante - istanteUltimoPasso) / VELOCITA_MS;
+  let frazione = (istante - istanteUltimoPasso) / tempoPasso;
   if (partitaFinita || frazione > 1) {
     frazione = 1;
   }

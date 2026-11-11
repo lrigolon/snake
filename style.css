@@ -66,13 +66,13 @@ h1 {
 /* Punteggio e record stanno uno accanto all'altro */
 .punteggi {
   display: flex;
-  gap: 8px;
+  gap: 6px;
 }
 
 /* Punteggio e record stanno ciascuno in una "pillola" semitrasparente */
 .barra p {
   margin: 0;
-  padding: 8px 14px;
+  padding: 8px 10px;
   font-size: 17px;
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.1);
@@ -137,6 +137,34 @@ button:active {
   transform: translateY(1px);
 }
 
+/* I due pulsanti (vista e ricomincia) stanno vicini */
+.pulsanti {
+  display: flex;
+  gap: 6px;
+}
+
+/* Nella barra i pulsanti sono un po' più stretti del normale:
+   così punteggio, record e i due pulsanti stanno su una riga sola */
+.barra button {
+  padding-left: 14px;
+  padding-right: 14px;
+}
+
+/* Pulsante "secondario": meno appariscente di "Ricomincia" */
+button.secondario {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: #e8eef5;
+  box-shadow: none;
+}
+
+@media (hover: hover) {
+  button.secondario:hover {
+    background: rgba(255, 255, 255, 0.14);
+    box-shadow: none;
+  }
+}
+
 /* ===== Zona di gioco ===== */
 
 /* "position: relative" permette di sovrapporre il messaggio alla tela */
@@ -163,6 +191,23 @@ canvas {
   height: auto;
   aspect-ratio: 1;
   border-radius: 10px;
+}
+
+/* ===== Vista 2D e vista 3D ===== */
+
+/* Nella vista 2D la tela 3D non si vede */
+.area-gioco:not(.modo-3d) #tela3d {
+  display: none;
+}
+
+/* Nella vista 3D la tela 2D sta sopra quella 3D, nella stessa posizione
+   (6px è lo spessore della cornice). "pointer-events: none" lascia passare
+   i tocchi del dito, così lo swipe funziona come sempre. */
+.modo-3d #tela {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  pointer-events: none;
 }
 
 /* Riquadro che copre la tela a fine partita: sfondo scuro e un po' sfocato */
@@ -365,7 +410,8 @@ kbd {
     font-size: 13px;
   }
 
-  button {
+  button,
+  .barra button {
     padding: 7px 10px;
     font-size: 13px;
   }

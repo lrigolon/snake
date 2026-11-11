@@ -20,12 +20,20 @@
         <!-- Il record è il punteggio migliore di sempre: resta salvato anche chiudendo il browser -->
         <p>Record: <span id="record">0</span></p>
       </div>
-      <button id="pulsante-ricomincia" type="button">Ricomincia</button>
+      <div class="pulsanti">
+        <!-- Cambia tra la vista 3D e quella 2D (il testo lo scrive JavaScript) -->
+        <button id="pulsante-vista" type="button" class="secondario">2D</button>
+        <button id="pulsante-ricomincia" type="button">Ricomincia</button>
+      </div>
     </div>
 
     <!-- Zona di gioco: il "canvas" è una tela su cui JavaScript disegna.
          Sul telefono, scorrendo il dito qui sopra si cambia direzione. -->
     <div class="area-gioco" id="area-gioco">
+      <!-- Tela per la vista 3D (la disegna grafica3d.js) -->
+      <canvas id="tela3d" width="400" height="400"></canvas>
+      <!-- Tela per la vista 2D. Nella vista 3D sta sopra quella 3D,
+           trasparente, e mostra solo la scritta "Livello ..." -->
       <canvas id="tela" width="400" height="400"></canvas>
 
       <!-- Riquadro che compare sopra la tela a fine partita -->
@@ -54,7 +62,9 @@
     <p class="istruzioni solo-touch">Scorri il dito sul campo o usa i pulsanti</p>
   </main>
 
-  <!-- Il codice del gioco. Lo mettiamo in fondo così la pagina è già pronta quando parte -->
+  <!-- Il codice del gioco. Lo mettiamo in fondo così la pagina è già pronta quando parte.
+       Prima la grafica 3D, poi il gioco vero e proprio, che la usa. -->
+  <script src="grafica3d.js"></script>
   <script src="script.js"></script>
 </body>
 </html>

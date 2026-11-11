@@ -102,6 +102,7 @@ let sottotitoloLivello = "";  // cosa è cambiato col nuovo livello (es. "Più v
 let record = leggiRecord(); // il punteggio migliore di sempre
 let recordBattuto;       // true se in questa partita il record è stato superato
 let istanteFinePartita = 0; // quando è finita l'ultima partita (in millisecondi)
+let vista3DAttiva = false;  // true se il gioco è disegnato in 3D (vedi grafica3d.js)
 
 
 // ---------- 3b. Salvataggio del record ----------
@@ -500,7 +501,11 @@ function creaParticelle(x, y) {
       vx: Math.cos(angolo) * velocita,
       vy: Math.sin(angolo) * velocita,
       vita: 1, // parte da 1 e scende fino a 0, poi la scintilla sparisce
-      colore: Math.random() < 0.5 ? COLORE_CIBO : "#ffd166"
+      colore: Math.random() < 0.5 ? COLORE_CIBO : "#ffd166",
+      // Solo per la vista 3D: altezza da terra (in celle) e velocità verso l'alto.
+      // Nella vista 2D questi due valori non vengono usati.
+      altezza: 0.5,
+      velocitaSu: 2 + Math.random() * 3
     });
   }
 }
@@ -514,6 +519,9 @@ function aggiornaParticelle(secondi) {
     p.vx *= 0.92; // rallentano un po' a ogni fotogramma
     p.vy *= 0.92;
     p.vita -= secondi * 2; // in mezzo secondo spariscono
+    // Nel 3D le scintille saltano in alto e la gravità le tira giù
+    p.altezza += p.velocitaSu * secondi;
+    p.velocitaSu -= 12 * secondi;
   });
 
   // Teniamo solo le scintille ancora "vive"
@@ -527,6 +535,15 @@ function aggiornaParticelle(secondi) {
 
 // Ridisegna tutto da capo. "istante" è l'ora attuale in millisecondi.
 function disegna(istante) {
+  // Vista 3D: la scena la disegna grafica3d.js sulla tela 3D. La tela 2D
+  // resta sopra, trasparente, e serve solo per la scritta "Livello ..."
+  if (vista3DAttiva) {
+    pennello.clearRect(0, 0, DIMENSIONE_CAMPO, DIMENSIONE_CAMPO);
+    disegna3D(istante);
+    disegnaScrittaLivello(istante);
+    return;
+  }
+
   pennello.save(); // salviamo le impostazioni del pennello per ripristinarle alla fine
 
   // Se il campo deve tremare, lo spostiamo un pochino a caso
@@ -700,8 +717,11 @@ function disegnaCibo(istante) {
   pennello.fill();
 }
 
-// Il serpente è disegnato come un tubo arrotondato con una sfumatura di colore
-function disegnaSerpente(istante) {
+// Calcola dove si trova ogni pezzo del serpente IN QUESTO ISTANTE, misurato
+// in celle. I numeri possono avere la virgola: x = 5.4 vuol dire "tra la
+// cella 5 e la 6", perché il serpente sta scivolando da una all'altra.
+// La usano sia il disegno 2D sia quello 3D (in grafica3d.js).
+function calcolaPuntiSerpente(istante) {
   // "frazione" dice a che punto siamo tra un passo e il successivo:
   // 0 = appena fatto il passo, 1 = è ora del passo seguente.
   let frazione = (istante - istanteUltimoPasso) / tempoPasso;
@@ -709,16 +729,27 @@ function disegnaSerpente(istante) {
     frazione = 1;
   }
 
-  // Calcoliamo il centro di ogni pezzo, a metà strada tra la posizione
-  // vecchia e quella nuova (in base alla frazione)
-  const punti = serpente.map(function (pezzo, indice) {
+  // Ogni pezzo sta a metà strada tra la posizione vecchia e quella nuova
+  // (in base alla frazione)
+  return serpente.map(function (pezzo, indice) {
     // Se il serpente si è appena allungato, il pezzo nuovo in coda non
     // aveva una posizione vecchia: usiamo quella dell'ultimo pezzo
     const indicePrima = Math.min(indice, serpentePrecedente.length - 1);
     const prima = serpentePrecedente[indicePrima];
     return {
-      x: (prima.x + (pezzo.x - prima.x) * frazione) * LATO_CELLA + LATO_CELLA / 2,
-      y: (prima.y + (pezzo.y - prima.y) * frazione) * LATO_CELLA + LATO_CELLA / 2
+      x: prima.x + (pezzo.x - prima.x) * frazione,
+      y: prima.y + (pezzo.y - prima.y) * frazione
+    };
+  });
+}
+
+// Il serpente è disegnato come un tubo arrotondato con una sfumatura di colore
+function disegnaSerpente(istante) {
+  // Trasformiamo le posizioni da celle a pixel, al centro di ogni cella
+  const punti = calcolaPuntiSerpente(istante).map(function (punto) {
+    return {
+      x: punto.x * LATO_CELLA + LATO_CELLA / 2,
+      y: punto.y * LATO_CELLA + LATO_CELLA / 2
     };
   });
 
@@ -988,6 +1019,53 @@ pulsanteRicomincia.addEventListener("click", function () {
 });
 
 
-// ---------- 11. Si parte! ----------
+// ---------- 11. Vista 2D o 3D ----------
+
+// Nome con cui la vista scelta viene ricordata nella memoria del browser
+const CHIAVE_VISTA = "snake-vista";
+const pulsanteVista = document.getElementById("pulsante-vista");
+
+// Proviamo ad accendere il 3D: se il browser non ci riesce, resta il 2D
+const supporta3D = inizializza3D(document.getElementById("tela3d"));
+
+// Attiva la vista 3D (in3D = true) oppure quella 2D (in3D = false).
+// La classe "modo-3d" dice al CSS quale tela mostrare.
+function impostaVista(in3D) {
+  vista3DAttiva = in3D && supporta3D;
+  areaGioco.classList.toggle("modo-3d", vista3DAttiva);
+  // Il pulsante dice dove si va cliccandolo. Il testo è corto per stare
+  // sulla stessa riga del punteggio; "title" è la spiegazione che compare
+  // tenendoci sopra il mouse.
+  pulsanteVista.textContent = vista3DAttiva ? "2D" : "3D";
+  pulsanteVista.title = vista3DAttiva ? "Passa alla vista 2D" : "Passa alla vista 3D";
+  pulsanteVista.setAttribute("aria-label", pulsanteVista.title);
+  try {
+    localStorage.setItem(CHIAVE_VISTA, vista3DAttiva ? "3d" : "2d");
+  } catch (errore) {
+    // Non si può salvare la scelta: pazienza
+  }
+}
+
+// Leggiamo la vista scelta l'ultima volta (se non c'è, si parte in 3D)
+function leggiVistaSalvata() {
+  try {
+    return localStorage.getItem(CHIAVE_VISTA) !== "2d";
+  } catch (errore) {
+    return true;
+  }
+}
+
+if (supporta3D) {
+  pulsanteVista.addEventListener("click", function () {
+    impostaVista(!vista3DAttiva);
+    pulsanteVista.blur(); // come per "Ricomincia": Spazio non deve ri-cliccarlo
+  });
+} else {
+  pulsanteVista.classList.add("nascosto"); // niente 3D: il pulsante non serve
+}
+impostaVista(leggiVistaSalvata());
+
+
+// ---------- 12. Si parte! ----------
 iniziaPartita();
 requestAnimationFrame(ciclo);
